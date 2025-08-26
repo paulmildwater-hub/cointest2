@@ -1,322 +1,297 @@
 """
-High-Volume Trading Engine - Optimized for frequent trades while maintaining quality
+Micro-Profit Trading Engine - COMPLETELY FIXED P&L calculations for high-frequency trading
 """
 
 import streamlit as st
 import time
-import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import *
 
-class HighVolumeTradingEngine:
+class MicroProfitTradingEngine:
     def __init__(self):
         self.config = NORMAL_SETTINGS.copy()
         self.price_history = {}
-        self.quick_scalp_targets = {}  # Track quick scalp opportunities
+        self.seen_tokens_reset_time = time.time()
         
     def apply_turbo_mode(self, enabled):
-        """Apply turbo mode settings for maximum volume"""
+        """Apply turbo mode settings"""
         if enabled:
             self.config = TURBO_SETTINGS.copy()
+            # Update global settings
             for key, value in TURBO_SETTINGS.items():
-                globals()[key] = value
+                if hasattr(st.session_state, f'config_{key.lower()}'):
+                    setattr(st.session_state, f'config_{key.lower()}', value)
         else:
             self.config = NORMAL_SETTINGS.copy()
-            for key, value in NORMAL_SETTINGS.items():
-                globals()[key] = value
     
-"""
-High-Volume Trading Engine - Optimized for frequent trades while maintaining quality
-"""
-
-import streamlit as st
-import time
-import random
-from datetime import datetime
-from config import *
-
-class HighVolumeTradingEngine:
-    def __init__(self):
-        self.config = NORMAL_SETTINGS.copy()
-        self.price_history = {}
-        self.quick_scalp_targets = {}  # Track quick scalp opportunities
-        
-    def apply_turbo_mode(self, enabled):
-        """Apply turbo mode settings for maximum volume"""
-        if enabled:
-            self.config = TURBO_SETTINGS.copy()
-            for key, value in TURBO_SETTINGS.items():
-                globals()[key] = value
-        else:
-            self.config = NORMAL_SETTINGS.copy()
-            for key, value in NORMAL_SETTINGS.items():
-                globals()[key] = value
+    def reset_seen_tokens_periodically(self):
+        """Reset seen tokens every 10 minutes for re-trading opportunities"""
+        current_time = time.time()
+        if current_time - self.seen_tokens_reset_time >= SEEN_TOKENS_RESET_TIME:
+            original_count = len(st.session_state.seen_tokens)
+            st.session_state.seen_tokens = set()
+            self.seen_tokens_reset_time = current_time
+            
+            if 'debug_info' in st.session_state:
+                debug_msg = f"Reset {original_count} seen tokens - allowing re-trades"
+                st.session_state.debug_info.append((f"[{datetime.now().strftime('%H:%M:%S')}] {debug_msg}", "info"))
     
     def should_buy_token(self, token):
-        """More permissive token selection for higher volume"""
+        """Extremely permissive token selection for high frequency"""
         mint = token.get('mint', '')
         
-        # Skip if already seen or owned
-        if mint in st.session_state.seen_tokens or mint in st.session_state.active_positions:
+        # Skip if currently owned (but allow re-trading after reset)
+        if mint in st.session_state.active_positions:
             return False
         
         # Check daily loss limit
         if st.session_state.daily_pnl <= MAX_DAILY_LOSS:
             return False
         
-        # More permissive score requirement for volume
+        # Very low score threshold
         score = token.get('score', 0)
         min_score = self.config.get('MIN_TOKEN_SCORE', MIN_TOKEN_SCORE)
         if score < min_score:
             return False
         
-        # More permissive momentum requirements
+        # Extremely permissive momentum - accept tiny movements
         price_change_1h = token.get('price_change_1h', 0)
         price_change_5m = token.get('price_change_5m', 0)
         
-        # Accept if either timeframe shows momentum
         min_increase = self.config.get('MIN_PRICE_INCREASE', MIN_PRICE_INCREASE) * 100
-        if price_change_1h < min_increase and price_change_5m < (min_increase * 0.5):
+        
+        # Accept if ANY timeframe shows momentum or even small negative
+        if price_change_1h < -10 and price_change_5m < -5:  # Only reject extreme negatives
             return False
         
-        # Expanded market cap range
+        # Very permissive market cap range
         market_cap = token.get('market_cap', 0)
         if not (MIN_MARKET_CAP <= market_cap <= MAX_MARKET_CAP):
             return False
         
-        # More permissive liquidity
+        # Low liquidity requirement
         liquidity = token.get('liquidity', 0)
         if liquidity < MIN_LIQUIDITY:
             return False
         
-        # Volume activity check
-        volume_24h = token.get('volume_24h', 0)
-        volume_to_mcap = volume_24h / market_cap if market_cap > 0 else 0
-        if volume_to_mcap < QUALITY_FILTERS['MIN_VOLUME_TO_MCAP_RATIO']:
-            return False
-        
+        # Mark as seen for current cycle
         st.session_state.seen_tokens.add(mint)
         return True
     
     def calculate_position_size(self, token):
-        """Dynamic position sizing for volume optimization"""
+        """Small, consistent position sizes for high frequency"""
         score = token.get('score', 0)
-        volume_24h = token.get('volume_24h', 0)
         
-        # Base size on score and volume
-        if score >= 75 and volume_24h > 500000:
-            return min(BASE_POSITION_SIZE * 2, MAX_POSITION_SIZE)
-        elif score >= 60 and volume_24h > 100000:
-            return BASE_POSITION_SIZE * 1.5
-        elif score >= 50:
-            return BASE_POSITION_SIZE * 1.2
+        # Keep positions small and consistent
+        if score >= 50:
+            return BASE_POSITION_SIZE * 1.3  # $15.6
+        elif score >= 35:
+            return BASE_POSITION_SIZE * 1.1  # $13.2
         else:
-            return BASE_POSITION_SIZE
+            return BASE_POSITION_SIZE  # $12
     
     def enter_position(self, token):
-        """Enter position with quick scalp detection"""
+        """Enter position with CORRECT P&L tracking from start"""
         try:
-            entry_price = token.get('price_usd', 0)
-            if entry_price <= 0:
+            base_price = token.get('price_usd', 0)
+            if base_price <= 0:
                 return None
             
             position_size = self.calculate_position_size(token)
-            entry_price = entry_price * (1 + SLIPPAGE)
             mint = token.get('mint', '')
+            
+            # STEP 1: Calculate entry with slippage and fees
+            entry_price_with_slippage = base_price * (1 + SLIPPAGE)  # Pay 0.2% more
+            net_investment = position_size - TRANSACTION_FEE  # Subtract entry fee
+            tokens_bought = net_investment / entry_price_with_slippage  # Actual tokens received
+            
+            # STEP 2: Store all the critical values for P&L calculation
+            position = {
+                'token': token,
+                'base_price': base_price,  # Original market price
+                'entry_price': entry_price_with_slippage,  # What we actually paid
+                'entry_time': datetime.now(),
+                'current_price': base_price,  # Track current market price
+                'position_size': position_size,  # Original investment
+                'net_investment': net_investment,  # After entry fee
+                'tokens_bought': tokens_bought,  # Actual tokens owned
+                'take_profit_1': base_price * (1 + self.config.get('TAKE_PROFIT_1', TAKE_PROFIT_1)),
+                'take_profit_2': base_price * (1 + self.config.get('TAKE_PROFIT_2', TAKE_PROFIT_2)),
+                'stop_loss': base_price * (1 - self.config.get('STOP_LOSS', STOP_LOSS)),
+                'highest_price': base_price,
+                'partial_sold': False,
+                'partial_tokens_sold': 0,
+                'partial_proceeds': 0,
+                'consecutive_no_change': 0,
+                'score': token.get('score', 0)
+            }
             
             # Initialize price history
             self.price_history[mint] = {
-                'prices': [entry_price],
-                'timestamps': [datetime.now()],
-                'last_significant_change': datetime.now()
-            }
-            
-            # Detect quick scalp opportunity
-            is_quick_scalp = self._is_quick_scalp_candidate(token)
-            
-            position = {
-                'token': token,
-                'entry_price': entry_price,
-                'entry_time': datetime.now(),
-                'current_price': entry_price,
-                'position_size': position_size,
-                'tokens_bought': (position_size - TRANSACTION_FEE) / entry_price,
-                'take_profit_1': entry_price * (1 + TAKE_PROFIT_1),
-                'take_profit_2': entry_price * (1 + TAKE_PROFIT_2),
-                'stop_loss': entry_price * (1 - STOP_LOSS),
-                'highest_price': entry_price,
-                'partial_sold': False,
-                'last_price_check': datetime.now(),
-                'consecutive_no_change_periods': 0,
-                'score': token.get('score', 0),
-                'trailing_stop': None,
-                'is_quick_scalp': is_quick_scalp,
-                'scalp_target': entry_price * 1.05 if is_quick_scalp else None  # 5% quick target
+                'prices': [base_price],
+                'timestamps': [datetime.now()]
             }
             
             st.session_state.active_positions[mint] = position
             st.session_state.equity -= position_size
             st.session_state.tokens_bought += 1
             
-            if is_quick_scalp:
-                self.quick_scalp_targets[mint] = datetime.now()
-            
             return position
+            
         except Exception as e:
             print(f"Error entering position: {e}")
             return None
     
-    def _is_quick_scalp_candidate(self, token):
-        """Identify tokens suitable for quick scalping"""
-        volume_24h = token.get('volume_24h', 0)
-        price_change_5m = token.get('price_change_5m', 0)
-        liquidity = token.get('liquidity', 0)
-        
-        # High volume, recent momentum, good liquidity
-        return (volume_24h > 200000 and 
-                price_change_5m > 1.0 and 
-                liquidity > 30000)
+    def calculate_current_pnl(self, position, current_market_price):
+        """COMPLETELY FIXED P&L calculation"""
+        try:
+            # Current tokens owned (account for partial sales)
+            current_tokens = position['tokens_bought'] - position.get('partial_tokens_sold', 0)
+            
+            if current_tokens <= 0:
+                return 0, 0  # No tokens left
+            
+            # Calculate exit proceeds with slippage and fees
+            exit_price_after_slippage = current_market_price * (1 - SLIPPAGE)  # Get 0.2% less
+            gross_proceeds = current_tokens * exit_price_after_slippage
+            net_proceeds = gross_proceeds - TRANSACTION_FEE  # Subtract exit fee
+            
+            # Add any previous partial sale proceeds
+            total_proceeds = net_proceeds + position.get('partial_proceeds', 0)
+            
+            # P&L = Total proceeds - Original investment
+            pnl = total_proceeds - position['position_size']
+            
+            return pnl, net_proceeds
+            
+        except Exception as e:
+            print(f"Error calculating P&L: {e}")
+            return 0, 0
     
     def check_exit_conditions(self, position, current_price):
-        """Enhanced exit logic for high volume trading"""
+        """Fast exit conditions for micro-profits"""
         mint = position['token'].get('mint', '')
         position['current_price'] = current_price
         
-        # Update price history
+        # Update price history for stagnation detection
         if mint in self.price_history:
             history = self.price_history[mint]
             history['prices'].append(current_price)
             history['timestamps'].append(datetime.now())
             
-            # Keep recent history
-            if len(history['prices']) > 20:
-                history['prices'] = history['prices'][-20:]
-                history['timestamps'] = history['timestamps'][-20:]
+            # Keep only recent history
+            if len(history['prices']) > 10:
+                history['prices'] = history['prices'][-10:]
+                history['timestamps'] = history['timestamps'][-10:]
         
         # Update highest price
         if current_price > position['highest_price']:
             position['highest_price'] = current_price
-            
-            # Dynamic trailing stop
-            gain_percent = ((current_price - position['entry_price']) / position['entry_price']) * 100
-            if gain_percent > 20:
-                position['trailing_stop'] = current_price * 0.92  # 8% trailing stop
-            elif gain_percent > 15:
-                position['trailing_stop'] = current_price * 0.95  # 5% trailing stop
         
+        # Calculate current P&L and percentage change
+        pnl, net_proceeds = self.calculate_current_pnl(position, current_price)
+        percent_change = ((current_price - position['base_price']) / position['base_price']) * 100
         time_held = (datetime.now() - position['entry_time']).total_seconds()
-        percent_change = ((current_price - position['entry_price']) / position['entry_price']) * 100
         
-        # Calculate P&L
-        position_size = position.get('position_size', BASE_POSITION_SIZE)
-        if position.get('partial_sold', False):
-            position_size = position_size / 2
-        
-        exit_price = current_price * (1 - SLIPPAGE)
-        gross_value = position['tokens_bought'] * exit_price
-        if position.get('partial_sold', False):
-            gross_value = gross_value / 2
-        
-        net_value = gross_value - TRANSACTION_FEE
-        pnl = net_value - position_size
-        
-        # QUICK SCALP EXIT - Priority for fast turnover
-        if position.get('is_quick_scalp', False) and mint in self.quick_scalp_targets:
-            scalp_time = (datetime.now() - self.quick_scalp_targets[mint]).total_seconds()
+        # PARTIAL PROFIT TAKING at 3%
+        profit_target_1 = self.config.get('TAKE_PROFIT_1', TAKE_PROFIT_1)
+        if not position.get('partial_sold', False) and percent_change >= (profit_target_1 * 100):
+            # Sell 50% of tokens
+            tokens_to_sell = position['tokens_bought'] * 0.5
+            partial_exit_price = current_price * (1 - SLIPPAGE)
+            partial_gross = tokens_to_sell * partial_exit_price
+            partial_net = partial_gross - TRANSACTION_FEE
             
-            # Quick 3-5% scalp exits
-            if percent_change >= 5 or scalp_time >= PROFIT_OPTIMIZATION.get('scalp_exit_time', 120):
-                if percent_change >= 2:  # At least 2% profit for scalp
-                    return True, 'QUICK_SCALP', pnl
-                elif scalp_time >= 120:  # Exit after 2 minutes regardless
-                    return True, 'SCALP_TIMEOUT', pnl
+            # Update position tracking
+            position['partial_sold'] = True
+            position['partial_tokens_sold'] = tokens_to_sell
+            position['partial_proceeds'] = partial_net
+            
+            # Calculate partial P&L
+            partial_investment = position['position_size'] * 0.5  # Half of original investment
+            partial_pnl = partial_net - partial_investment
+            
+            # Update equity immediately
+            st.session_state.equity += partial_net
+            st.session_state.daily_pnl += partial_pnl
+            
+            return False, 'PARTIAL_3%', partial_pnl
         
-        # MULTI-LEVEL PROFIT TAKING for volume
-        if not position.get('partial_sold', False):
-            if percent_change >= 8:  # First level at 8%
-                position['partial_sold'] = True
-                partial_pnl = (position_size * 0.4) * 0.08  # Take 40% at 8%
-                st.session_state.equity += (position_size * 0.4) + partial_pnl
-                st.session_state.daily_pnl += partial_pnl
-                position['tokens_bought'] = position['tokens_bought'] * 0.6
-                return False, 'PARTIAL_8%', partial_pnl
-        
-        # IMPROVED NO-CHANGE DETECTION
+        # NO-CHANGE DETECTION (ultra-fast)
+        no_change_time = self.config.get('NO_CHANGE_SELL_TIME', NO_CHANGE_SELL_TIME)
         if mint in self.price_history:
-            history = self.price_history[mint]
-            recent_prices = history['prices'][-5:] if len(history['prices']) >= 5 else history['prices']
-            
-            if len(recent_prices) > 1:
-                price_variance = max(recent_prices) - min(recent_prices)
-                relative_variance = price_variance / current_price
+            recent_prices = self.price_history[mint]['prices'][-3:]
+            if len(recent_prices) >= 3:
+                price_range = max(recent_prices) - min(recent_prices)
+                relative_range = price_range / current_price
                 
-                # Faster exit for no movement
-                if relative_variance < 0.003:  # Less than 0.3% variance
-                    position['consecutive_no_change_periods'] += 1
-                    
-                    no_change_threshold = 2 if st.session_state.turbo_mode else 3
-                    if position['consecutive_no_change_periods'] >= no_change_threshold:
+                if relative_range < 0.001:  # Less than 0.1% movement
+                    position['consecutive_no_change'] += 1
+                    if position['consecutive_no_change'] >= 2:  # Very quick exit
                         return True, 'NO_CHANGE', pnl
                 else:
-                    position['consecutive_no_change_periods'] = 0
+                    position['consecutive_no_change'] = 0
         
-        # TRAILING STOP
-        if position.get('trailing_stop') and current_price <= position['trailing_stop']:
-            return True, 'TRAILING_STOP', pnl
+        # PROFIT TARGETS (micro-profits)
+        profit_target_2 = self.config.get('TAKE_PROFIT_2', TAKE_PROFIT_2)
+        if percent_change >= (profit_target_2 * 100):  # 5% target
+            return True, 'TAKE_PROFIT_5%', pnl
         
-        # STANDARD EXITS - Faster for volume
-        if percent_change >= 20:  # Take profit at 20%
-            return True, 'TAKE_PROFIT_20%', pnl
-        elif percent_change <= -8:  # Stop loss at 8%
-            return True, 'STOP_LOSS_8%', pnl
-        elif time_held >= MAX_TRADE_DURATION:  # Max hold time
+        # TIGHT STOP LOSS
+        stop_loss_pct = self.config.get('STOP_LOSS', STOP_LOSS)
+        if percent_change <= -(stop_loss_pct * 100):  # 2.5% stop loss
+            return True, 'STOP_LOSS_2.5%', pnl
+        
+        # QUICK TIMEOUT (3 minutes)
+        if time_held >= MAX_TRADE_DURATION:
             return True, 'TIMEOUT', pnl
         
-        # MOMENTUM REVERSAL - Quick exit on trend change
-        if percent_change > 3 and mint in self.price_history:
-            recent_prices = self.price_history[mint]['prices'][-4:]
-            if len(recent_prices) >= 4:
-                # Check for 3 consecutive drops
-                if (recent_prices[-1] < recent_prices[-2] < 
-                    recent_prices[-3] < recent_prices[-4]):
-                    return True, 'MOMENTUM_REVERSAL', pnl
-        
-        # VOLUME DECAY EXIT - If volume drops significantly
-        current_volume = position['token'].get('volume_24h', 0)
-        if current_volume > 0 and time_held > 300:  # After 5 minutes
-            volume_decay = current_volume / position['token'].get('volume_24h', 1)
-            if volume_decay < 0.5:  # Volume dropped by 50%+
-                return True, 'VOLUME_DECAY', pnl
+        # MICRO-PROFIT SCALPING - Exit small wins quickly
+        if 1 <= percent_change <= 2 and time_held >= 60:  # 1-2% after 1 minute
+            return True, 'MICRO_SCALP', pnl
         
         return False, 'HOLDING', pnl
     
     def close_position(self, mint, reason, pnl):
-        """Close position with volume tracking"""
+        """Close position with ACCURATE final P&L recording"""
         position = st.session_state.active_positions[mint]
-        position_size = position.get('position_size', BASE_POSITION_SIZE)
+        current_price = position['current_price']
         
-        if position.get('partial_sold', False):
-            position_size = position_size * 0.6  # Remaining 60%
+        # Calculate FINAL accurate P&L
+        final_pnl, final_proceeds = self.calculate_current_pnl(position, current_price)
         
-        # Record trade
-        trade = self._create_trade_record(position, reason, pnl, position_size)
+        # Use calculated P&L, not passed P&L (which might be wrong)
+        actual_pnl = final_pnl
+        
+        # Record trade with correct values
+        trade = self._create_trade_record(position, reason, actual_pnl)
         st.session_state.trades.append(trade)
         
-        # Update equity and P&L
-        st.session_state.equity += position_size + pnl
-        st.session_state.daily_pnl += pnl
+        # Update equity correctly
+        remaining_tokens = position['tokens_bought'] - position.get('partial_tokens_sold', 0)
+        if remaining_tokens > 0:
+            # Add final sale proceeds
+            st.session_state.equity += final_proceeds
+        
+        # Update daily P&L (don't double-count partial sales)
+        if not position.get('partial_sold', False):
+            st.session_state.daily_pnl += actual_pnl
+        else:
+            # Only add the remaining P&L (partial already added)
+            remaining_pnl = actual_pnl - position.get('partial_proceeds', 0) + (position['position_size'] * 0.5)
+            st.session_state.daily_pnl += remaining_pnl
         
         # Update streaks
-        if pnl > 0:
+        if actual_pnl > 0:
             st.session_state.win_streak += 1
             st.session_state.loss_streak = 0
-            if pnl > st.session_state.best_trade:
-                st.session_state.best_trade = pnl
+            if actual_pnl > st.session_state.best_trade:
+                st.session_state.best_trade = actual_pnl
         else:
             st.session_state.loss_streak += 1
             st.session_state.win_streak = 0
-            if pnl < st.session_state.worst_trade:
-                st.session_state.worst_trade = pnl
+            if actual_pnl < st.session_state.worst_trade:
+                st.session_state.worst_trade = actual_pnl
         
         # Track P&L history
         current_total_pnl = sum(t['pnl'] for t in st.session_state.trades)
@@ -327,27 +302,28 @@ class HighVolumeTradingEngine:
         del st.session_state.active_positions[mint]
         if mint in self.price_history:
             del self.price_history[mint]
-        if mint in self.quick_scalp_targets:
-            del self.quick_scalp_targets[mint]
     
-    def _create_trade_record(self, position, reason, pnl, position_size):
-        """Create detailed trade record"""
-        percent_change = ((position['current_price'] - position['entry_price']) / position['entry_price']) * 100
+    def _create_trade_record(self, position, reason, pnl):
+        """Create trade record with correct values"""
+        current_price = position['current_price']
+        base_price = position['base_price']
+        
+        percent_change = ((current_price - base_price) / base_price) * 100
         duration_seconds = (datetime.now() - position['entry_time']).total_seconds()
         
         return {
             'timestamp': datetime.now(),
             'symbol': position['token']['symbol'],
             'mint_address': position['token'].get('mint', ''),
-            'entry_price': position['entry_price'],
-            'exit_price': position['current_price'],
+            'entry_price': base_price,  # Use base price for consistency
+            'exit_price': current_price,
             'exit_reason': reason,
-            'pnl': pnl,
-            'pnl_percent': (pnl / position_size) * 100 if position_size > 0 else 0,
+            'pnl': pnl,  # FIXED: Using correctly calculated P&L
+            'pnl_percent': (pnl / position['position_size']) * 100 if position['position_size'] > 0 else 0,
             'duration_seconds': duration_seconds,
             'duration_minutes': duration_seconds / 60,
             'percent_change': percent_change,
-            'position_size': position_size,
+            'position_size': position['position_size'],
             'partial_sold': position.get('partial_sold', False),
             'source': position['token'].get('source', 'Unknown'),
             'score': position.get('score', 0),
@@ -359,38 +335,36 @@ class HighVolumeTradingEngine:
             'price_change_24h_at_entry': position['token'].get('price_change_24h', 0),
             'txns_24h': position['token'].get('txns_24h', 0),
             'dex': position['token'].get('dex', 'unknown'),
-            'highest_price_reached': position.get('highest_price', position['entry_price']),
-            'max_profit_potential': ((position.get('highest_price', position['entry_price']) - position['entry_price']) / position['entry_price']) * 100,
+            'highest_price_reached': position.get('highest_price', base_price),
+            'max_profit_potential': ((position.get('highest_price', base_price) - base_price) / base_price) * 100,
             'turbo_mode': st.session_state.turbo_mode,
             'hour_of_day': datetime.now().hour,
             'day_of_week': datetime.now().weekday(),
-            'is_quick_scalp': position.get('is_quick_scalp', False)
+            'is_quick_scalp': reason == 'MICRO_SCALP'
         }
     
     def update_all_prices(self, data_fetcher):
-        """Fast price updates for high volume trading"""
+        """Fast price updates"""
         if not st.session_state.active_positions:
             return
         
-        updated_count = 0
         for mint, position in st.session_state.active_positions.items():
             try:
                 new_price = data_fetcher.get_current_price(position['token'])
                 if new_price > 0:
-                    current_price = position.get('current_price', position['entry_price'])
+                    # Accept reasonable price movements
+                    current_price = position.get('current_price', position['base_price'])
                     price_change_ratio = abs(new_price - current_price) / current_price
                     
-                    # Accept larger price movements for high volume trading
-                    if price_change_ratio < 0.7:  # Accept up to 70% moves
+                    if price_change_ratio < 0.5:  # 50% sanity check
                         position['current_price'] = new_price
-                        if new_price > position.get('highest_price', position['entry_price']):
+                        if new_price > position.get('highest_price', position['base_price']):
                             position['highest_price'] = new_price
-                        updated_count += 1
             except Exception as e:
                 continue
     
     def run_trading_cycle(self, data_fetcher):
-        """High-frequency trading cycle"""
+        """Ultra-fast trading cycle"""
         if not st.session_state.bot_running:
             return
         
@@ -400,21 +374,26 @@ class HighVolumeTradingEngine:
             return
         
         current_time = time.time()
+        
+        # Very fast cycles
         if current_time - st.session_state.last_update < CYCLE_DELAY:
             return
         
         st.session_state.last_update = current_time
         
-        # More frequent price updates for volume trading
+        # Reset seen tokens periodically for re-trading
+        self.reset_seen_tokens_periodically()
+        
+        # Fast price updates
         if current_time - st.session_state.last_price_update >= PRICE_UPDATE_INTERVAL:
             st.session_state.last_price_update = current_time
             self.update_all_prices(data_fetcher)
         
-        # Check exits more frequently
+        # Check exits frequently
         positions_to_close = []
         for mint, position in list(st.session_state.active_positions.items()):
             try:
-                current_price = data_fetcher.get_current_price(position['token'])
+                current_price = position.get('current_price', position['base_price'])
                 if current_price > 0:
                     should_exit, reason, pnl = self.check_exit_conditions(position, current_price)
                     if should_exit:
@@ -428,7 +407,7 @@ class HighVolumeTradingEngine:
             except Exception as e:
                 continue
         
-        # More frequent token scanning for volume
+        # Aggressive token scanning
         scan_interval = self.config.get('SCAN_INTERVAL', SCAN_INTERVAL)
         if current_time - st.session_state.last_token_check >= scan_interval:
             st.session_state.last_token_check = current_time
@@ -440,8 +419,8 @@ class HighVolumeTradingEngine:
                     bought_this_cycle = 0
                     max_positions = self.config.get('MAX_CONCURRENT_POSITIONS', MAX_CONCURRENT_POSITIONS)
                     
-                    # Take more tokens per cycle for volume
-                    for token in tokens[:20]:  # Consider top 20 tokens
+                    # Take many more tokens per cycle
+                    for token in tokens[:50]:  # Consider top 50
                         if len(st.session_state.active_positions) >= max_positions:
                             break
                         
@@ -449,18 +428,15 @@ class HighVolumeTradingEngine:
                         if st.session_state.equity < position_size:
                             continue
                         
-                        if bought_this_cycle >= 8:  # Increased from 3 to 8
+                        if bought_this_cycle >= 15:  # Up to 15 new positions per cycle
                             break
                         
                         if self.should_buy_token(token):
                             if self.enter_position(token):
                                 bought_this_cycle += 1
+                                
                 except Exception as e:
                     print(f"Error in token scanning: {e}")
-                
-                # Clean seen tokens more frequently
-                if len(st.session_state.seen_tokens) > 800:
-                    st.session_state.seen_tokens = set(list(st.session_state.seen_tokens)[-400:])
 
 # Create alias for backward compatibility  
-TradingEngine = HighVolumeTradingEngine
+TradingEngine = MicroProfitTradingEngine
