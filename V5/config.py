@@ -1,53 +1,67 @@
 """
-Volume-Boosted Configuration - Increase trade frequency while maintaining quality
+Micro-Profit High-Frequency Configuration - Optimized for $50/hour on Solana
 """
 
-# Trading Parameters - Optimized for higher volume
-BASE_POSITION_SIZE = 20  # Increased from $15 to $20 for better profit per trade
-MAX_POSITION_SIZE = 40  # Increased from $25 to $40 for high conviction
-TAKE_PROFIT_1 = 0.12   # Reduced from 15% to 12% for faster exits
-TAKE_PROFIT_2 = 0.20   # Reduced from 25% to 20% for quicker full exits
-STOP_LOSS = 0.08       # Keep tight at 8%
-MAX_TRADE_DURATION = 600  # Reduced from 900s (15min) to 600s (10min) for faster turnover
-SLIPPAGE = 0.005
-TRANSACTION_FEE = 0.25
-MAX_CONCURRENT_POSITIONS = 100  # Increased from 50 to 100
-MIN_PRICE_INCREASE = 0.015  # Slightly reduced from 2% to 1.5%
-STAGNANT_SELL_TIME = 90   # Reduced from 120s to 90s
-NO_CHANGE_SELL_TIME = 30  # Reduced from 45s to 30s
-MAX_DAILY_LOSS = -150     # Increased from -100 to -150 to allow more trades
-MIN_TOKEN_SCORE = 50      # Reduced from 70 to 50 for more opportunities
+# High-Frequency Micro-Profit Parameters
+BASE_POSITION_SIZE = 12   # Reduced from 20 to 12 for higher frequency
+MAX_POSITION_SIZE = 20    # Reduced from 40 to 20
+TAKE_PROFIT_1 = 0.03      # 3% first target (was 8%)
+TAKE_PROFIT_2 = 0.05      # 5% second target (was 20%)
+STOP_LOSS = 0.025         # 2.5% stop loss (was 8%)
+MAX_TRADE_DURATION = 180  # 3 minutes max (was 10 minutes)
 
-# Market parameters - Expanded ranges for more opportunities
-MIN_MARKET_CAP = 15000    # Reduced from 30k to 15k
-MIN_LIQUIDITY = 15000     # Reduced from 25k to 15k  
-MAX_MARKET_CAP = 2000000  # Increased from 1M to 2M
+# Accurate Solana Network Fees
+SOLANA_BASE_FEE = 0.000005    # ~$0.0001
+SOLANA_PRIORITY_FEE = 0.001   # ~$0.02 for fast execution
+SOLANA_SWAP_FEE_RATE = 0.003  # 0.3% average DEX fee
+SLIPPAGE = 0.002              # 0.2% slippage (tighter)
+TRANSACTION_FEE = 0.05        # Total ~$0.05 per trade (much lower)
 
-# Timing parameters - Faster scanning
-SCAN_INTERVAL = 1         # Reduced from 2s to 1s for faster discovery
-PRICE_UPDATE_INTERVAL = 1 # Update prices every second
-CYCLE_DELAY = 0.2         # Faster cycles
+# High-Frequency Settings
+MAX_CONCURRENT_POSITIONS = 200  # High volume
+MIN_PRICE_INCREASE = 0.005      # 0.5% minimum (very low)
+STAGNANT_SELL_TIME = 30         # 30 seconds
+NO_CHANGE_SELL_TIME = 15        # 15 seconds
+MAX_DAILY_LOSS = -100           # Tight daily control
+MIN_TOKEN_SCORE = 25            # Very low threshold
 
-# Turbo mode settings - Even more aggressive
+# Expanded Market Parameters
+MIN_MARKET_CAP = 5000          # Much lower
+MIN_LIQUIDITY = 5000           # Much lower  
+MAX_MARKET_CAP = 5000000       # Higher ceiling
+
+# Ultra-Fast Timing
+SCAN_INTERVAL = 0.5            # Scan every 500ms
+PRICE_UPDATE_INTERVAL = 0.5    # Update every 500ms
+CYCLE_DELAY = 0.1              # 100ms cycles
+SEEN_TOKENS_RESET_TIME = 600   # Reset seen tokens every 10 minutes
+
+# Turbo mode for maximum aggression
 TURBO_SETTINGS = {
-    'MIN_TOKEN_SCORE': 35,           # Reduced from 50 to 35
-    'MIN_PRICE_INCREASE': 0.01,      # Reduced from 0.015 to 0.01
-    'MIN_MARKET_CAP': 10000,         # Reduced from 20k to 10k
-    'MIN_LIQUIDITY': 10000,          # Reduced from 15k to 10k
-    'MAX_CONCURRENT_POSITIONS': 150, # Increased from 75 to 150
-    'SCAN_INTERVAL': 0.5,            # Scan every 500ms
-    'NO_CHANGE_SELL_TIME': 20        # Exit faster at 20s
+    'MIN_TOKEN_SCORE': 15,           # Extremely low
+    'MIN_PRICE_INCREASE': 0.002,     # 0.2% minimum
+    'MIN_MARKET_CAP': 2000,          # Very low
+    'MIN_LIQUIDITY': 2000,           # Very low
+    'MAX_CONCURRENT_POSITIONS': 300,
+    'SCAN_INTERVAL': 0.3,            # 300ms
+    'NO_CHANGE_SELL_TIME': 10,       # 10 seconds
+    'TAKE_PROFIT_1': 0.02,           # 2% 
+    'TAKE_PROFIT_2': 0.04,           # 4%
+    'STOP_LOSS': 0.02                # 2%
 }
 
-# Normal mode settings - More permissive than before
+# Normal mode - still aggressive
 NORMAL_SETTINGS = {
-    'MIN_TOKEN_SCORE': 50,           # Reduced from 70 to 50
-    'MIN_PRICE_INCREASE': 0.015,     # Reduced from 0.02 to 0.015
-    'MIN_MARKET_CAP': 15000,         # Reduced from 30k to 15k
-    'MIN_LIQUIDITY': 15000,          # Reduced from 25k to 15k
-    'MAX_CONCURRENT_POSITIONS': 100, # Increased from 50 to 100
-    'SCAN_INTERVAL': 1,              # Faster from 2s
-    'NO_CHANGE_SELL_TIME': 30        # Faster from 45s
+    'MIN_TOKEN_SCORE': 25,
+    'MIN_PRICE_INCREASE': 0.005,
+    'MIN_MARKET_CAP': 5000,
+    'MIN_LIQUIDITY': 5000,
+    'MAX_CONCURRENT_POSITIONS': 200,
+    'SCAN_INTERVAL': 0.5,
+    'NO_CHANGE_SELL_TIME': 15,
+    'TAKE_PROFIT_1': 0.03,
+    'TAKE_PROFIT_2': 0.05,
+    'STOP_LOSS': 0.025
 }
 
 # API Configuration
@@ -59,93 +73,59 @@ API_HEADERS = {
     'Pragma': 'no-cache'
 }
 
-# EXPANDED Search queries for more token discovery
+# Massively expanded search for maximum discovery
 SEARCH_QUERIES = [
-    # Original high-volume searches
-    "SOL", "pump", "moon", "rocket", "new", "gem", "100x",
-    # Meme categories
-    "pepe", "bonk", "wif", "doge", "shib", "floki", "inu", "cat",
-    "frog", "wojak", "chad", "based", "wagmi", "gm",
-    # Trending/popular terms
-    "ai", "trump", "elon", "bitcoin", "eth", "defi", "nft",
-    "meta", "web3", "dao", "yield", "stake", "farm",
-    # Additional discovery terms
-    "alpha", "beta", "gamma", "token", "coin", "crypto",
-    "trade", "swap", "dex", "pool", "pair", "launch"
+    # Core Solana
+    "SOL", "pump", "bonk", "wif", "jupiter", "orca", "raydium",
+    # Meme coins (high activity)
+    "pepe", "doge", "shib", "wojak", "chad", "frog", "cat", "dog",
+    "ape", "moon", "rocket", "gem", "100x", "1000x", "diamond",
+    # New/trending
+    "new", "fresh", "launch", "fair", "stealth", "based", "alpha",
+    "beta", "gamma", "sigma", "chad", "wagmi", "gm", "ngmi",
+    # Pump.fun ecosystem
+    "pumpfun", "pump.fun", "bonding", "curve", "graduation",
+    # DeFi/utility
+    "defi", "yield", "farm", "stake", "swap", "dex", "nft", "dao",
+    # Trending topics
+    "ai", "trump", "elon", "meta", "tiktok", "x", "twitter",
+    # Random discovery
+    "a", "b", "c", "1", "2", "3", "test", "coin", "token",
+    # Time-based
+    "today", "2025", "jan", "winter", "monday", "week"
 ]
 
-# New: Multiple data sources for broader coverage
-DATA_SOURCES = {
-    'dexscreener': {
-        'enabled': True,
-        'weight': 0.6,  # 60% of tokens from DexScreener
-        'queries': SEARCH_QUERIES[:20]
-    },
-    'birdeye': {
-        'enabled': True,  # Enable Birdeye as secondary source
-        'weight': 0.3,    # 30% from Birdeye
-        'base_url': 'https://public-api.birdeye.so/public'
-    },
-    'jupiter': {
-        'enabled': True,  # Enable Jupiter token list
-        'weight': 0.1,    # 10% from Jupiter
-        'base_url': 'https://token.jup.ag'
-    }
-}
-
-# Quality filters - More permissive for higher volume
+# Extremely permissive quality filters
 QUALITY_FILTERS = {
-    'MIN_VOLUME_TO_MCAP_RATIO': 3.0,     # Reduced from 5.0 to 3.0
-    'MIN_MOMENTUM_SCORE': 7.0,           # Reduced from 10.0 to 7.0
-    'MAX_AGE_HOURS': 168,                # Increased from 48 to 168 (1 week)
-    'MIN_HOLDER_COUNT': 50,              # Reduced from 100 to 50
-    'MAX_TOP_HOLDER_PERCENT': 40,        # Increased from 30% to 40%
+    'MIN_VOLUME_TO_MCAP_RATIO': 1.0,    # Very low
+    'MIN_MOMENTUM_SCORE': 0.0,          # Accept any momentum
+    'MAX_AGE_HOURS': 720,               # 30 days
+    'MIN_HOLDER_COUNT': 10,             # Very low
+    'MAX_TOP_HOLDER_PERCENT': 60,       # Very permissive
 }
 
-# Risk management settings - Adjusted for higher volume
+# Aggressive risk settings
 RISK_SETTINGS = {
-    'MAX_DAILY_TRADES': 100,             # Increased from 50 to 100
-    'MAX_EQUITY_PER_TRADE': 0.08,        # Increased from 5% to 8%
-    'STOP_TRADING_WIN_STREAK': False,    
-    'STOP_TRADING_LOSS_STREAK': 8,       # Increased tolerance from 5 to 8
-    'DAILY_PROFIT_TARGET': 40,           
-    'TAKE_BREAK_AFTER_TARGET': False,    
+    'MAX_DAILY_TRADES': 500,            # Very high
+    'MAX_EQUITY_PER_TRADE': 0.15,       # 15% max
+    'STOP_TRADING_WIN_STREAK': False,
+    'STOP_TRADING_LOSS_STREAK': 15,     # High tolerance
+    'DAILY_PROFIT_TARGET': 50,
+    'TAKE_BREAK_AFTER_TARGET': False,
 }
 
-# New: Additional blockchain networks for diversification
-SUPPORTED_NETWORKS = {
-    'solana': {
-        'enabled': True,
-        'dex_sources': ['raydium', 'orca', 'jupiter', 'pumpfun'],
-        'min_liquidity': 10000
-    },
-    'ethereum': {
-        'enabled': False,  # Can enable for ETH tokens
-        'dex_sources': ['uniswap', 'sushiswap'],
-        'min_liquidity': 50000  # Higher due to gas costs
-    },
-    'base': {
-        'enabled': False,  # Can enable for Base network
-        'dex_sources': ['uniswap'],
-        'min_liquidity': 25000
-    }
+# Network optimized for Solana speed
+NETWORK_PRIORITY = {
+    'solana': 1,      # Highest priority
+    'base': 2,        # Secondary
+    'arbitrum': 3,    # Tertiary
+    'polygon': 4,     # Quaternary
+    'ethereum': 5     # Lowest (too expensive)
 }
 
-# Volume boost strategies
-VOLUME_STRATEGIES = {
-    'multi_timeframe_scanning': True,    # Scan multiple timeframes
-    'cross_dex_arbitrage': False,        # Look for price differences
-    'momentum_following': True,          # Follow momentum trends
-    'mean_reversion': False,             # Counter-trend strategy
-    'breakout_detection': True,          # Detect price breakouts
-}
-
-# Profit optimization
-PROFIT_OPTIMIZATION = {
-    'dynamic_position_sizing': True,     # Adjust size based on confidence
-    'partial_profit_levels': [0.08, 0.12, 0.20],  # Multiple take profit levels
-    'trailing_stop_activation': 0.15,   # Start trailing at 15%
-    'trailing_stop_distance': 0.05,     # 5% trailing distance
-    'quick_scalp_mode': True,           # Enable quick 3-5% scalps
-    'scalp_exit_time': 120,             # Exit scalps after 2 minutes
-}
+# Profit target calculation for $50/hour
+# At $0.50 avg profit per trade, need 100 trades/hour
+# At $0.30 avg profit per trade, need 167 trades/hour
+# At $0.20 avg profit per trade, need 250 trades/hour
+TARGET_TRADES_PER_HOUR = 150
+TARGET_AVG_PROFIT = 0.33  # $0.33 per trade for $50/hour
