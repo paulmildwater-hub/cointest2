@@ -1,6 +1,6 @@
 """
-Improved Multi-DEX Trading Bot - Launch Code
-Main application file with all improvements integrated
+Micro-Profit High-Frequency Trading Bot - Main Application
+Updated for $50/hour target with fixed P&L calculations
 """
 
 import streamlit as st
@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from collections import deque
 
-# Import improved bot modules
+# Import updated bot modules
 from config import *
 from data_fetcher import DataFetcher
 from trading_engine import TradingEngine
@@ -17,14 +17,14 @@ from ui_components import UIComponents
 
 # Page configuration
 st.set_page_config(
-    page_title="Multi-DEX Token Trader - Improved",
+    page_title="Micro-Profit Trading Bot - $50/Hour Target",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state
+# Initialize session state with micro-profit defaults
 def init_session_state():
-    """Initialize all session state variables"""
+    """Initialize all session state variables for micro-profit trading"""
     defaults = {
         'equity': 1000.0,
         'starting_equity': 1000.0,
@@ -33,14 +33,14 @@ def init_session_state():
         'seen_tokens': set(),
         'bot_running': False,
         'turbo_mode': False,
-        'debug_info': deque(maxlen=100),  # Increased for better logging
+        'debug_info': deque(maxlen=100),
         'last_update': time.time(),
         'api_calls_count': 0,
         'tokens_bought': 0,
         'tokens_found': 0,
         'last_token_check': time.time(),
-        'pnl_history': [],
-        'time_history': [],
+        'pnl_history': [0],
+        'time_history': [datetime.now()],
         'last_price_update': time.time(),
         'daily_pnl': 0,
         'win_streak': 0,
@@ -49,20 +49,13 @@ def init_session_state():
         'worst_trade': 0,
         'trades_per_hour': 0,
         'last_hour_check': datetime.now(),
-        'total_exit_reasons': {},  # Track exit reason diversity
-        'high_score_trades': 0,    # Count trades with score 70+
-        'paper_trading_mode': True  # Start in paper trading mode
+        'micro_profit_target': 50,  # $50/hour target
+        'session_start_time': datetime.now()
     }
     
     for key, default_value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default_value
-
-def log_performance_improvement(message, msg_type="info"):
-    """Enhanced logging with performance tracking"""
-    timestamp = datetime.now().strftime('%H:%M:%S')
-    formatted_msg = f"[{timestamp}] {message}"
-    st.session_state.debug_info.append((formatted_msg, msg_type))
 
 # Initialize components
 init_session_state()
@@ -71,230 +64,109 @@ trading_engine = TradingEngine()
 analytics = Analytics()
 ui = UIComponents()
 
-# Enhanced UI with improvement tracking
-st.title("Multi-DEX Smart Token Trader - IMPROVED VERSION")
-st.markdown("**Quality over Quantity | Smart Exits | Selective Entry | Risk-Focused**")
+# Main UI
+st.title("Micro-Profit High-Frequency Trading Bot")
+st.markdown("**Target: $50/hour | Strategy: 150+ trades/hour at $0.33 avg profit | Fixed P&L Calculations**")
 
-# Performance improvement banner
-if st.session_state.paper_trading_mode:
-    st.error("🧪 PAPER TRADING MODE - Testing improvements before live trading")
-else:
-    st.success("🚀 LIVE TRADING MODE - Improved algorithm active")
-
-# Key improvement metrics in sidebar
-with st.sidebar:
-    st.header("🔧 Bot Improvements")
+# Micro-profit target progress bar
+if st.session_state.trades:
+    session_duration = (datetime.now() - st.session_state.session_start_time).total_seconds() / 3600
+    current_rate = st.session_state.daily_pnl / session_duration if session_duration > 0 else 0
+    progress = min(current_rate / 50, 1.0) if current_rate > 0 else 0
     
-    # Show current vs old settings comparison
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        st.metric("Min Score", "70", "+350%")
-        st.metric("Max Positions", "50", "-75%")
-        st.metric("Stop Loss", "8%", "-2%")
+        st.progress(progress)
+        st.caption(f"Progress to $50/hour: {progress*100:.1f}% (Currently: ${current_rate:.2f}/hr)")
     with col2:
-        st.metric("Min Liquidity", "$25k", "+400%")
-        st.metric("Max Hold Time", "15min", "-50%")
-        st.metric("Daily Loss Limit", "$100", "-50%")
-    
-    # Quality metrics
-    if st.session_state.trades:
-        high_score_rate = (st.session_state.high_score_trades / len(st.session_state.trades)) * 100
-        st.metric("High Score Trades", f"{high_score_rate:.1f}%")
-        
-        exit_diversity = len(st.session_state.total_exit_reasons)
-        st.metric("Exit Reason Types", exit_diversity)
-    
-    # Mode toggle
-    if st.button("🔄 Toggle Trading Mode"):
-        st.session_state.paper_trading_mode = not st.session_state.paper_trading_mode
-        if st.session_state.paper_trading_mode:
-            log_performance_improvement("Switched to PAPER TRADING mode", "warning")
-        else:
-            log_performance_improvement("Switched to LIVE TRADING mode", "success")
+        st.metric("Session Duration", f"{session_duration:.1f}h")
+    with col3:
+        st.metric("Target Gap", f"${50-current_rate:.2f}/hr")
 
-# Performance metrics with improvements highlighted
+# Performance metrics
 ui.render_performance_metrics()
 
-# Enhanced control buttons with safety checks
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+# Control buttons
+ui.render_control_buttons(trading_engine)
 
-with col1:
-    if not st.session_state.bot_running:
-        if st.session_state.paper_trading_mode:
-            button_text = "START PAPER TRADING"
-        else:
-            button_text = "START LIVE TRADING"
-    else:
-        button_text = "PAUSE TRADING"
+# Strategy info boxes
+ui.render_strategy_info()
+
+# Micro-profit system status
+with st.sidebar:
+    st.header("Micro-Profit System Status")
     
-    if st.button(button_text, type="primary", use_container_width=True):
-        st.session_state.bot_running = not st.session_state.bot_running
-        if st.session_state.bot_running:
-            mode = "paper" if st.session_state.paper_trading_mode else "live"
-            log_performance_improvement(f"🚀 Bot started in {mode} mode with improved algorithm", "success")
-
-with col2:
-    if st.button("TURBO MODE" if not st.session_state.turbo_mode else "NORMAL MODE", 
-                type="primary" if not st.session_state.turbo_mode else "secondary",
-                use_container_width=True):
-        st.session_state.turbo_mode = not st.session_state.turbo_mode
-        trading_engine.apply_turbo_mode(st.session_state.turbo_mode)
-        
-        if st.session_state.turbo_mode:
-            log_performance_improvement("TURBO MODE - Min score: 50, Max positions: 75", "warning")
-        else:
-            log_performance_improvement("NORMAL MODE - Min score: 70, Max positions: 50", "info")
-
-with col3:
-    if st.button("RESET BOT", use_container_width=True):
-        # Reset with new defaults
-        st.session_state.equity = 1000.0
-        st.session_state.starting_equity = 1000.0
-        st.session_state.trades = []
-        st.session_state.active_positions = {}
-        st.session_state.seen_tokens = set()
-        st.session_state.debug_info = deque(maxlen=100)
-        st.session_state.api_calls_count = 0
-        st.session_state.tokens_bought = 0
-        st.session_state.tokens_found = 0
-        st.session_state.pnl_history = []
-        st.session_state.time_history = []
-        st.session_state.daily_pnl = 0
-        st.session_state.win_streak = 0
-        st.session_state.loss_streak = 0
-        st.session_state.best_trade = 0
-        st.session_state.worst_trade = 0
-        st.session_state.trades_per_hour = 0
-        st.session_state.total_exit_reasons = {}
-        st.session_state.high_score_trades = 0
-        log_performance_improvement("Bot reset with improved settings", "info")
-
-with col4:
-    if st.button("QUALITY SCAN", use_container_width=True):
-        log_performance_improvement("Scanning for HIGH-QUALITY tokens only...", "info")
-
-with col5:
-    if st.button("CLEAR SEEN", use_container_width=True):
-        st.session_state.seen_tokens = set()
-        log_performance_improvement("Cleared seen tokens - will evaluate all tokens again", "success")
-
-with col6:
-    if st.button("EXPORT DATA", use_container_width=True):
-        if st.session_state.trades:
-            log_performance_improvement("Preparing trade data for analysis...", "info")
-        else:
-            log_performance_improvement("No trades to export yet", "warning")
-
-# Strategy info with improvements highlighted
-col1, col2, col3 = st.columns(3)
-
-with col1:
+    # System parameters
+    st.subheader("Current Settings")
     if st.session_state.turbo_mode:
-        st.warning("""
-        **⚡ TURBO MODE - IMPROVED:**
-        - Max 75 positions (was 300)
-        - Min score: 50 (was 10)
-        - Min market cap: $20k (was $5k)
-        - Min liquidity: $15k (was $1k)
-        - Faster exits: 30s no-change
-        - Quality focused scanning
-        """)
-    else:
-        st.info("""
-        **🎯 NORMAL MODE - IMPROVED:**
-        - Max 50 positions (was 200)
-        - Min score: 70 (was 20)
-        - Market cap: $30k-$500k sweet spot
-        - Min liquidity: $25k (was $5k)
-        - Smart exit detection
-        - Premium token selection only
-        """)
-
-with col2:
-    win_rate = 0
-    if st.session_state.trades:
-        wins = len([t for t in st.session_state.trades if t['pnl'] > 0])
-        win_rate = (wins / len(st.session_state.trades)) * 100
-    
-    color = "success" if win_rate >= 25 else "warning" if win_rate >= 15 else "error"
-    
-    if color == "success":
-        st.success(f"""
-        **📈 PERFORMANCE TARGET:**
-        - Current win rate: {win_rate:.1f}%
-        - Target: 25-35% win rate
-        - Goal: $40/hour profit
-        - Strategy: Quality over quantity
-        - Status: ON TRACK ✅
-        """)
-    else:
-        st.warning(f"""
-        **📈 PERFORMANCE TARGET:**
-        - Current win rate: {win_rate:.1f}%
-        - Target: 25-35% win rate  
-        - Goal: $40/hour profit
-        - Strategy: Quality over quantity
-        - Status: IMPROVING 🔄
-        """)
-
-with col3:
-    total_pnl = sum(t['pnl'] for t in st.session_state.trades) if st.session_state.trades else 0
-    hourly_rate = 0
-    if st.session_state.trades:
-        total_time_hours = sum(t.get('duration_minutes', 0) for t in st.session_state.trades) / 60
-        if total_time_hours > 0:
-            hourly_rate = total_pnl / total_time_hours
-    
-    if hourly_rate > 0:
-        st.success(f"""
-        **💰 LIVE PERFORMANCE:**
-        - Trades: {len(st.session_state.trades)}
-        - Active: {len(st.session_state.active_positions)}
-        - Hourly rate: ${hourly_rate:.2f}/hr
-        - Daily P&L: ${st.session_state.daily_pnl:.2f}
-        - Equity: ${st.session_state.equity:.2f}
+        st.info(f"""
+        **TURBO MICRO MODE:**
+        - Position Size: ${BASE_POSITION_SIZE * 1.3:.0f} max
+        - Profit Targets: {TURBO_SETTINGS['TAKE_PROFIT_1']*100:.0f}%, {TURBO_SETTINGS['TAKE_PROFIT_2']*100:.0f}%
+        - Stop Loss: {TURBO_SETTINGS['STOP_LOSS']*100:.1f}%
+        - Scan Interval: {TURBO_SETTINGS['SCAN_INTERVAL']*1000:.0f}ms
+        - Score Threshold: {TURBO_SETTINGS['MIN_TOKEN_SCORE']}
         """)
     else:
         st.info(f"""
-        **💰 LIVE PERFORMANCE:**
-        - Trades: {len(st.session_state.trades)}
-        - Active: {len(st.session_state.active_positions)}
-        - Hourly rate: ${hourly_rate:.2f}/hr
-        - Daily P&L: ${st.session_state.daily_pnl:.2f}
-        - Equity: ${st.session_state.equity:.2f}
+        **NORMAL MICRO MODE:**
+        - Position Size: ${BASE_POSITION_SIZE}-{MAX_POSITION_SIZE}
+        - Profit Targets: {TAKE_PROFIT_1*100:.0f}%, {TAKE_PROFIT_2*100:.0f}%
+        - Stop Loss: {STOP_LOSS*100:.1f}%
+        - Scan Interval: {SCAN_INTERVAL*1000:.0f}ms
+        - Score Threshold: {MIN_TOKEN_SCORE}
         """)
+    
+    # Real-time frequency tracking
+    st.subheader("Frequency Tracking")
+    trades_last_hour = st.session_state.trades_per_hour
+    target_trades = TARGET_TRADES_PER_HOUR
+    frequency_progress = min(trades_last_hour / target_trades, 1.0)
+    
+    st.progress(frequency_progress)
+    st.caption(f"Trade Frequency: {trades_last_hour}/{target_trades} trades/hour")
+    
+    # P&L accuracy verification
+    if st.session_state.trades:
+        recent_trades = st.session_state.trades[-5:]
+        profitable_moves = len([t for t in recent_trades if t.get('percent_change', 0) > 0])
+        profitable_pnl = len([t for t in recent_trades if t.get('pnl', 0) > 0])
+        
+        st.subheader("P&L Calculation Health")
+        if profitable_moves == profitable_pnl:
+            st.success(f"P&L Accurate: {profitable_pnl}/{profitable_moves} matches")
+        else:
+            st.error(f"P&L Error: {profitable_pnl}/{profitable_moves} profitable")
+    
+    # Network status
+    st.subheader("Network Status")
+    st.metric("API Calls", st.session_state.api_calls_count)
+    st.metric("Tokens Found", st.session_state.tokens_found)
+    
+    # Seen tokens management
+    seen_count = len(st.session_state.seen_tokens)
+    st.metric("Seen Tokens", seen_count)
+    if seen_count > 500:
+        st.warning("High seen token count - resets every 10min")
 
-# Enhanced position tracking
+# Active positions
 if st.session_state.active_positions:
     ui.render_active_positions()
 
-# Performance chart with improvements
+# P&L Chart
 if len(st.session_state.pnl_history) > 1:
     ui.render_pnl_chart()
 
-# Trading tabs with improvement tracking
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+# Trading tabs
+tab1, tab2, tab3, tab4 = st.tabs([
     "Live Activity", 
     "Trade History", 
-    "Statistics",
-    "Analysis & Export",
-    "Improvements"
+    "Statistics", 
+    "Analysis & Export"
 ])
 
 with tab1:
-    st.subheader("Live Trading Activity - Enhanced Logging")
-    if st.session_state.debug_info:
-        for msg, msg_type in list(st.session_state.debug_info)[-25:]:
-            if msg_type == "success":
-                st.success(msg)
-            elif msg_type == "error":
-                st.error(msg)
-            elif msg_type == "warning":
-                st.warning(msg)
-            else:
-                st.info(msg)
-    else:
-        st.info("Click START TRADING to begin with improved algorithm...")
+    ui.render_live_activity()
 
 with tab2:
     ui.render_trade_history()
@@ -305,119 +177,91 @@ with tab3:
 with tab4:
     ui.render_analysis_export(analytics)
 
-with tab5:
-    st.subheader("Algorithm Improvements")
+# Micro-profit performance summary
+if st.session_state.trades:
+    st.subheader("Micro-Profit Performance Summary")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    
+    total_pnl = sum(t['pnl'] for t in st.session_state.trades)
+    avg_pnl = total_pnl / len(st.session_state.trades) if st.session_state.trades else 0
+    
+    winning_trades = [t for t in st.session_state.trades if t['pnl'] > 0]
+    losing_trades = [t for t in st.session_state.trades if t['pnl'] < 0]
+    
+    avg_win = sum(t['pnl'] for t in winning_trades) / len(winning_trades) if winning_trades else 0
+    avg_loss = sum(t['pnl'] for t in losing_trades) / len(losing_trades) if losing_trades else 0
+    
+    # Micro-profit specific metrics
+    micro_profits = [t for t in st.session_state.trades if 0 < t['pnl'] < 1]
+    quick_trades = [t for t in st.session_state.trades if t.get('duration_seconds', 0) < 180]
     
     with col1:
-        st.markdown("### Fixes Implemented")
-        st.markdown("""
-        - **Exit Logic Fixed**: Proper price movement detection
-        - **Selectivity Improved**: Min score 70 vs 20 (250% increase)
-        - **Risk Reduced**: Max positions 50 vs 200 (75% reduction)
-        - **Quality Focus**: Market cap sweet spot $30k-$500k
-        - **Faster Exits**: 15min max hold vs 30min
-        - **Better Stops**: 8% stop loss vs 10%
-        - **Momentum Required**: Both 5m and 1h positive momentum
-        """)
-    
+        st.metric("Total P&L", f"${total_pnl:.2f}")
     with col2:
-        st.markdown("### Expected Improvements")
-        st.markdown("""
-        - **Win Rate**: Target 25-35% vs 6.5% current
-        - **Hourly Rate**: Target $15-40/hr vs -$17/hr current
-        - **Exit Diversity**: Multiple exit types vs only "NO_CHANGE"
-        - **Risk Control**: -$100 max daily loss vs -$200
-        - **Position Quality**: All trades score 70+ vs accepting 35+
-        - **Monitoring**: Better price tracking and change detection
-        """)
+        st.metric("Avg Trade", f"${avg_pnl:.3f}")
+    with col3:
+        st.metric("Micro-Profits", len(micro_profits))
+    with col4:
+        st.metric("Quick Trades (<3min)", len(quick_trades))
+    with col5:
+        st.metric("Avg Win", f"${avg_win:.3f}")
+    with col6:
+        st.metric("Avg Loss", f"${avg_loss:.3f}")
 
-# Enhanced main trading loop with improvement tracking
-def run_improved_bot():
-    """Enhanced bot execution loop with improvement monitoring"""
+# Main trading loop with micro-profit optimizations
+def run_micro_profit_bot():
+    """Enhanced bot execution loop for micro-profit system"""
     if st.session_state.bot_running:
+        # Run trading cycle with error handling
         try:
-            # Track high-quality trade attempts
-            initial_tokens_found = st.session_state.tokens_found
-            
-            # Run improved trading cycle
             trading_engine.run_trading_cycle(data_fetcher)
-            
-            # Track improvements in real-time
-            if st.session_state.trades:
-                recent_trade = st.session_state.trades[-1]
-                
-                # Track high score trades
-                if recent_trade.get('score', 0) >= 70:
-                    st.session_state.high_score_trades += 1
-                
-                # Track exit reason diversity
-                exit_reason = recent_trade.get('exit_reason', 'UNKNOWN')
-                if exit_reason in st.session_state.total_exit_reasons:
-                    st.session_state.total_exit_reasons[exit_reason] += 1
-                else:
-                    st.session_state.total_exit_reasons[exit_reason] = 1
-                
-                # Log improvement metrics
-                if exit_reason != 'NO_CHANGE':
-                    log_performance_improvement(f"Exit diversity: {exit_reason} (not just NO_CHANGE)", "success")
-                
-                if recent_trade.get('score', 0) >= 70:
-                    log_performance_improvement(f"High-quality trade: Score {recent_trade.get('score', 0)}", "success")
-            
-            # Log token quality improvements
-            if st.session_state.tokens_found != initial_tokens_found:
-                log_performance_improvement(f"Found {st.session_state.tokens_found} high-quality tokens (score 70+)", "info")
-            
         except Exception as e:
-            log_performance_improvement(f"❌ Error in improved trading cycle: {str(e)[:100]}", "error")
-            time.sleep(2)
+            ui.log_debug(f"Error in micro-profit cycle: {str(e)[:100]}", "error")
+            time.sleep(1)
         
-        # Auto-refresh with improved timing
-        time.sleep(0.3)
+        # Ultra-fast refresh for micro-profit system
+        time.sleep(CYCLE_DELAY)
         st.rerun()
+    else:
+        # Slower refresh when not trading
+        time.sleep(2)
 
-# Execute improved bot
-run_improved_bot()
+# Execute micro-profit bot
+run_micro_profit_bot()
 
-# Enhanced footer with improvement info
+# Enhanced footer
 st.markdown("---")
-st.markdown("### IMPROVED ALGORITHM ACTIVE")
-st.caption("**FIXED EXIT LOGIC**: Proper price movement detection with multiple exit triggers")
-st.caption("**QUALITY FOCUS**: Only trades with score 70+ in premium market cap range")  
-st.caption("**RISK MANAGED**: Max 50 positions, 8% stop loss, $100 daily limit")
-st.caption("**FASTER DECISIONS**: 15min max hold, smart momentum detection")
-st.caption("**DATA DRIVEN**: Based on analysis of your losing trades to fix root causes")
-st.caption("**PAPER TRADE**: Test improvements safely before risking capital")
+st.markdown("### MICRO-PROFIT TRADING SYSTEM - OPTIMIZED FOR $50/HOUR")
 
-# Performance comparison widget
-with st.expander("Before vs After Comparison"):
-    col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("**SYSTEM IMPROVEMENTS:**")
+    st.caption("- Fixed P&L calculations (profit trades now show as profits)")
+    st.caption("- Micro-profit targets: 3% and 5% with 2.5% stop loss")
+    st.caption("- Ultra-fast cycles: 100ms with 500ms scanning")
+    st.caption("- Seen token reset every 10 minutes for re-trading")
+
+with col2:
+    st.markdown("**SOLANA OPTIMIZED:**")
+    st.caption("- Transaction fees: ~$0.05 per trade (vs $0.25)")
+    st.caption("- Position sizes: $12-20 for high frequency")
+    st.caption("- Slippage: 0.2% (tighter than 0.5%)")
+    st.caption("- Max hold time: 3 minutes for quick turnover")
+
+with col3:
+    st.markdown("**TARGET METRICS:**")
+    st.caption("- 150 trades/hour target frequency")
+    st.caption("- $0.33 average profit per trade")
+    st.caption("- Score threshold: 25 (vs 50 previously)")
+    st.caption("- Market cap range: $5k-$5M (expanded)")
+
+# Performance warning if needed
+if st.session_state.trades and len(st.session_state.trades) >= 10:
+    recent_trades = st.session_state.trades[-10:]
+    positive_changes = len([t for t in recent_trades if t.get('percent_change', 0) > 0])
+    positive_pnl = len([t for t in recent_trades if t.get('pnl', 0) > 0])
     
-    with col1:
-        st.markdown("#### OLD PERFORMANCE")
-        st.markdown("""
-        - Win Rate: 6.5% (2/31 trades)
-        - Hourly Rate: -$17.14/hour
-        - Exit Reason: 100% "NO_CHANGE"
-        - Min Score: Accepted as low as 35
-        - Max Positions: 200+ concurrent
-        - Risk: -$200 daily loss limit
-        """)
-    
-    with col2:
-        st.markdown("#### NEW TARGET PERFORMANCE")
-        current_win_rate = 0
-        if st.session_state.trades:
-            wins = len([t for t in st.session_state.trades if t['pnl'] > 0])
-            current_win_rate = (wins / len(st.session_state.trades)) * 100
-        
-        st.markdown(f"""
-        - Win Rate: {current_win_rate:.1f}% (Target: 25-35%)
-        - Hourly Rate: Target $15-40/hour  
-        - Exit Diversity: Multiple exit types
-        - Min Score: 70+ only (premium quality)
-        - Max Positions: 50 (focused approach)
-        - Risk: -$100 daily loss limit
-        """)
+    if positive_changes > positive_pnl + 2:  # Allow some tolerance
+        st.error(f"P&L CALCULATION WARNING: {positive_changes} positive price moves but only {positive_pnl} profitable P&L results. Check calculation accuracy.")
